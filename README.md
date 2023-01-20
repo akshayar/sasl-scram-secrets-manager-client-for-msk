@@ -23,3 +23,31 @@ String secret = Secrets.getSecret(secretNamePrefix + saslscramUser, Secrets.getS
 ### Install the jar file.  
 
     mvn clean install -f pom.xml
+
+# Supporting Password Roation
+To support password rotation there are two problems to be solved. One change of password at MSK . 
+Second managing authentication failure at client end and get new password on auth failure. 
+For the first problem you need to integrate Secret Manager with a rotation function created usign AWS Lambda. 
+Refer https://docs.aws.amazon.com/secretsmanager/latest/userguide/reference_available-rotation-templates.html#OTHER_rotation_templates
+For the second problem you need to extend AuthenticateCallbackHandler and pull the secret again from the secret manager. 
+
+## Rotation function using Lambda
+When you create the Secret Manager configuration you can add rotation configuraiton and attach the a Lambda function. 
+Secret Manager will use the Lambda function to change the password. 
+For MSK the sample Lambda function is at [rotation-lambda.py](src/main/python/msk-sasl-scram-rotation-lambda/rotation-lambda.py)
+
+
+## AuthenticateCallbackHandler
+The clients have to handle authentication failure due to change of password and re-establish the connection and trust. 
+Refer to the configuration at [kafka-sasl-secretmanager.properties](src/main/resources/kafka-sasl-secretmanager.properties).
+Following is the relevant part. 
+```
+security.protocol=SASL_SSL
+sasl.mechanism=SCRAM-SHA-512
+sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required \
+  secretId="<ARN>" \
+  region="<REGION>" ;
+sasl.client.callback.handler.class=com.amazonaws.kafka.samples.saslscram.SecretManagerClientCallbackHandler
+
+```
+Refer the code for [com.amazonaws.kafka.samples.saslscram.SecretManagerClientCallbackHandler](src/main/java/com/amazonaws/kafka/samples/saslscram/SecretManagerClientCallbackHandler.java)
