@@ -32,12 +32,19 @@ Refer https://docs.aws.amazon.com/secretsmanager/latest/userguide/reference_avai
 For the second problem you need to extend AuthenticateCallbackHandler and pull the secret again from the secret manager. 
 
 ## Rotation function using Lambda
-When you create the Secret Manager configuration you can add rotation configuraiton and attach the a Lambda function. 
-Secret Manager will use the Lambda function to change the password. 
+When you create the Secret Manager configuration you can add rotation configuraiton and configure a Lambda function. 
+Secret Manager will use the Lambda function to change the password of MSK. 
 For MSK the sample Lambda function is at [rotation-lambda.py](src/main/python/msk-sasl-scram-rotation-lambda/rotation-lambda.py)
+The Lambda function will call batch_disassociate_scram_secret followed by batch_associate_scram_secret to associate the new password to the MSK cluster. 
+Here is the sequence of action you need to follow 
+
+1. Create the MSK cluster and setup SASL/SCRAM following https://docs.aws.amazon.com/msk/latest/developerguide/msk-password.html#msk-password-tutorial. 
+2. Create Lambda using CloudFormation template at [secret-rotation-lambda.yaml](src/main/cloudformation/secret-rotation-lambda.yaml). Ensure that you add parameters including MSK ARN needed by the template. 
+3. Modify the Secret Manager to add rotation configuration and associate the Lambda created above. Refer https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html. 
+4. Test the configuration by doing immediate rotation. 
 
 
-## AuthenticateCallbackHandler
+## Handling password rotation at client code using AuthenticateCallbackHandler
 The clients have to handle authentication failure due to change of password and re-establish the connection and trust. 
 Refer to the configuration at [kafka-sasl-secretmanager.properties](src/main/resources/kafka-sasl-secretmanager.properties).
 Following is the relevant part. 
